@@ -4,6 +4,8 @@ An AI agent that turns a portfolio manager's rough notes (typed, or spoken into 
 
 Built for the Old Mutual AI analyst programmer stage 2 challenge. All data is synthetic.
 
+**Demo video:** [`demo/demo.mp4`](demo/demo.mp4) is a screen recording of the agent working end to end: notes in, a follow-up question, the review panel, and the proposal in the generator.
+
 **Model and framework:** Google Gemini (`gemini-3.8-flash`, with `gemini-3.1-flash-lite` as an automatic backup) through the `google-genai` Python SDK. The backend is Flask. There is no agent framework: the pipeline is a few plain Python functions, so every step can be read and tested. I built it with Claude Code and tested it myself (162 unit tests).
 
 ## What it does
@@ -70,6 +72,7 @@ app/whatsapp.py      optional WhatsApp front end (see below)
 app/pdf_export.py    makes the proposal PDF on the server, for WhatsApp
 static/index.html    the page
 generator/           Old Mutual's challenge-generator.html, unmodified
+demo/                demo.mp4, the screen recording
 samples/             the four sample notes and expected outputs
 tests/               162 unit tests
 ```
