@@ -73,6 +73,7 @@ def propose():
         evidence=result.evidence,
         retried=result.retried,
         corrections=result.corrections,
+        ai_notes=result.ai_notes,
         questions=ask_questions(result.flags, notes),
         clarification_header=CLARIFICATION_HEADER,
         skipped=skipped,

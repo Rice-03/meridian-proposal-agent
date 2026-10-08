@@ -13,9 +13,12 @@ from dataclasses import dataclass, field
 
 from .checks import verify
 from .llm import LLMError, generate_json
+from .numparse import numbers_in
 from .to_proposal import to_proposal
 
 MAX_NOTES_CHARS = 20000
+MAX_AI_NOTES = 5
+MAX_AI_NOTE_CHARS = 240
 
 
 def _nullable(kind, description):
@@ -74,6 +77,12 @@ EXTRACTION_SCHEMA = {
             },
         },
 
+        "ai_notes": {
+            "type": ["array", "null"],
+            "description": "At most 5 short plain sentences for the Portfolio Manager about what is missing, unclear or inconsistent in the notes. Facts about the notes only: no advice, no suggested figures, no number that is not written in the notes.",
+            "items": {"type": "string"},
+        },
+
         "client_situation": _nullable("string", "2 to 4 plain sentences, third person, summarising the client's situation and needs. Use ONLY facts and numbers that are in the notes."),
         "risk_profile": _nullable("string", "1 to 3 sentences on the client's attitude to risk, using only what the notes say."),
     },
@@ -112,6 +121,10 @@ You are an extraction tool, not an adviser. Follow these rules exactly.
     Treat an answer there as the final word on its topic: it overrides any hedged or conflicting wording earlier in the notes, and you should quote from it as evidence.
     Use only what the answer says. If an answer is vague, or says to skip it or leave it blank, ignore that answer:
     keep whatever the earlier notes said about that item (null if they said nothing). Only a clear new value overrides the notes.
+13. AI NOTES. In ai_notes, give at most 5 short, plain sentences for the Portfolio Manager about what is missing, unclear or inconsistent in the notes.
+    For example: "No investment amount is given, only 'a few million'." or "The client is described as risk-averse but also wants strong growth."
+    Write only facts about the notes. Give no advice. Do not suggest, estimate or round any figure, and use no number that is not written in the notes.
+    Do not count things ("three items are missing"). Do not mention anything the PM CLARIFICATION section already answers. Return an empty array if nothing stands out.
 
 Return only the JSON object."""
 
@@ -135,6 +148,32 @@ def _dump(obj):
     return json.dumps(obj, ensure_ascii=False)
 
 
+def clean_ai_notes(raw, notes):
+    """Keep only the model's notes that are safe to show.
+
+    These notes are the model's own words, so they get a plain-code check too: text only, short, at most
+    MAX_AI_NOTES of them, and no number that is not in the notes (the same rule as for every figure).
+    A note that fails is dropped, never repaired. They are advice to the PM and never reach the proposal.
+    """
+    if not isinstance(raw, list):
+        return []
+    allowed = set(numbers_in(notes))
+    kept, seen = [], set()
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        text = " ".join(item.split())
+        if not text or len(text) > MAX_AI_NOTE_CHARS or text.lower() in seen:
+            continue
+        if not set(numbers_in(text)) <= allowed:
+            continue
+        seen.add(text.lower())
+        kept.append(text)
+        if len(kept) == MAX_AI_NOTES:
+            break
+    return kept
+
+
 @dataclass
 class Result:
     proposal: dict = field(default_factory=dict)
@@ -142,6 +181,7 @@ class Result:
     evidence: list = field(default_factory=list)   # list of dicts: field, value, quote
     retried: bool = False
     corrections: list = field(default_factory=list)  # what the first answer got wrong, if a correction was needed
+    ai_notes: list = field(default_factory=list)     # the model's own observations for the PM (checked for invented numbers)
 
 
 def _unverified(report):
@@ -157,6 +197,7 @@ def run(notes, llm=generate_json):
 
     extraction = llm(SYSTEM_PROMPT, build_user_message(notes), EXTRACTION_SCHEMA)
     report = verify(extraction, notes)
+    final = extraction
     retried = False
 
     problems = _unverified(report)
@@ -167,6 +208,7 @@ def run(notes, llm=generate_json):
             retried = True
             if len(_unverified(second_report)) <= len(problems):
                 report = second_report
+                final = second
         except LLMError:
             pass  # keep the first result; its unverified items are already flagged
 
@@ -176,4 +218,5 @@ def run(notes, llm=generate_json):
         evidence=report.evidence,
         retried=retried,
         corrections=[p.message for p in problems] if retried else [],
+        ai_notes=clean_ai_notes(final.get("ai_notes") if isinstance(final, dict) else None, notes),
     )

@@ -42,6 +42,12 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(data["retried"])
         self.assertEqual(data["corrections"], ["c"])
 
+    def test_propose_includes_the_ai_notes(self):
+        fake = Result(proposal={}, ai_notes=["No amount is given."])
+        with mock.patch.object(self.server, "run", return_value=fake):
+            data = self.client.post("/api/propose", json={"notes": "n"}).get_json()
+        self.assertEqual(data["ai_notes"], ["No amount is given."])
+
     def test_propose_includes_the_agents_questions_and_the_clarification_header(self):
         fake = Result(proposal={}, flags=[{"level": "unverified", "field": "horizon", "message": "Horizon could not be verified."}])
         asked = [{"field": "horizon", "label": "investment horizon", "question": "What horizon?", "flags": ["Horizon could not be verified."]}]

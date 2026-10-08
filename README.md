@@ -4,7 +4,7 @@ An AI agent that turns a portfolio manager's rough notes (typed, or spoken into 
 
 Built for the Old Mutual AI analyst programmer stage 2 challenge. All data is synthetic.
 
-**Model and framework:** Google Gemini (`gemini-3.8-flash`, with `gemini-3.1-flash-lite` as an automatic backup) through the `google-genai` Python SDK. The backend is Flask. There is no agent framework: the pipeline is a few plain Python functions, so every step can be read and tested. I built it with Claude Code and tested it myself (148 unit tests).
+**Model and framework:** Google Gemini (`gemini-3.8-flash`, with `gemini-3.1-flash-lite` as an automatic backup) through the `google-genai` Python SDK. The backend is Flask. There is no agent framework: the pipeline is a few plain Python functions, so every step can be read and tested. I built it with Claude Code and tested it myself (162 unit tests).
 
 ## What it does
 
@@ -12,9 +12,10 @@ Built for the Old Mutual AI analyst programmer stage 2 challenge. All data is sy
 2. Gemini extracts the facts and, for every figure, quotes the exact words it came from.
 3. Plain Python code checks each quote really is in the notes and that the number matches the quote. Anything it cannot verify is dropped and flagged. The model never writes the flags.
 4. If the notes only hint at something, the agent asks a short follow-up question. Anything the notes simply do not say is listed under "Not in the notes" and is left blank.
+   The model also writes a few short observations of its own about what is missing or unclear (for example "the client says low risk but wants strong growth"). These appear in a separate group, "Noticed by the AI", labelled as suggestions. Code only checks that they contain no number that is not in the notes, and they never go into the proposal.
 5. The verified result is turned into a proposal object (see `proposal-schema.md` in the challenge pack) and loaded into the original generator, which is shown on the same page.
 
-The page has three parts: the notes box, a review panel (questions and flags), and the Old Mutual generator, served unmodified inside the page.
+The page has three parts: the notes box, a "Review before sending" panel (questions and flags), and the Old Mutual generator, served unmodified inside the page.
 
 ## How to run
 
@@ -70,14 +71,14 @@ app/pdf_export.py    makes the proposal PDF on the server, for WhatsApp
 static/index.html    the page
 generator/           Old Mutual's challenge-generator.html, unmodified
 samples/             the four sample notes and expected outputs
-tests/               148 unit tests
+tests/               162 unit tests
 ```
 
 ## Design choices and why
 
 Old Mutual asked me to make assumptions and explain why. These are mine.
 
-**1. The model extracts, code verifies.** The brief's rule is "never guess a number for a client". A model that checks its own work can be confidently wrong, so the model has to quote the notes for every figure, and plain code checks the quote is really there. Flags come from this code, not from the model, so the model cannot talk itself past a rule. The model still does real work: extraction, evidence quotes, marking hints as tentative, the client summary, phrasing the follow-up questions, and a correction pass when a check fails. I know a reviewer could prefer model-written flags. My answer is that for money, a repeatable check is safer, and the "what I would do next" section covers adding model-written advice in a separate place.
+**1. The model extracts, code verifies.** The brief's rule is "never guess a number for a client". A model that checks its own work can be confidently wrong, so the model has to quote the notes for every figure, and plain code checks the quote is really there. Flags come from this code, not from the model, so the model cannot talk itself past a rule. The model still does real work: extraction, evidence quotes, marking hints as tentative, the client summary, phrasing the follow-up questions, and a correction pass when a check fails. The model also does the noticing in its own words: it writes short observations about gaps and oddities, shown separately as "Noticed by the AI" and labelled as suggestions, so they are never confused with the checked flags. They are checked only for invented numbers, and they never reach the proposal.
 
 **2. Ask only when unsure, flag the rest.** The brief says to either ask a follow-up or flag the gaps. Asking about everything that is missing makes the agent annoying, and on a first call the PM often does not have the number yet. So the agent asks only when the notes contain something it had to read into (for example "balanced-ish", which is a hint and not a decision, or a figure it could not verify). Things that are simply not in the notes are listed under "Not in the notes" and left blank. The code decides what to ask, the model only words the question, and at most 8 questions are asked. Answers are added to the notes under a "PM CLARIFICATION" heading, and the model is told that heading is the final word on its topic. A skipped answer ("leave blank", "not sure") changes nothing.
 
@@ -87,7 +88,7 @@ Old Mutual asked me to make assumptions and explain why. These are mine.
 
 **5. The client's situation is written to two fields.** `proposal-schema.md` documents a `needs` field, but this generator no longer prints a needs page. It prints `goalAssessment.rationale` on the "Goal Assessment & Proposal" page. I fill both, so the text appears whichever one is read. All the code that knows the shape of the proposal is in `app/to_proposal.py`, so if the contract changes, that is the only file to edit.
 
-**6. Missing information stays out of the client's text.** The summary of the client's situation is written about the client only. Gaps ("amount to be confirmed") are shown in the review panel for the PM, not written into text that may be printed for the client. The sample expected file for sample 3 puts a "TO CONFIRM" line inside the needs text. I chose the separate panel instead.
+**6. Missing information is not written into the proposal text.** The client summary only describes the client. What is missing (for example the amount) is listed in the "Review before sending" panel on the page, for the portfolio manager, because the proposal text may be printed for the client. Old Mutual's expected output for sample 3 writes a "TO CONFIRM" note inside the proposal text instead. I chose the separate panel so the document stays clean.
 
 **7. The generator is not modified.** It is served as-is from the same origin, and the page calls `window.loadProposal`. The model choice (`applyModel`) loads the allocation, composition and the model's own objective settings, exactly as picking the model in the generator would. That is why the model shows in both of its dropdowns.
 
@@ -106,7 +107,7 @@ Old Mutual asked me to make assumptions and explain why. These are mine.
 With more time I would:
 
 1. **Compare models properly, and try Claude.** I chose Gemini first because it has a free tier. The provider is isolated in one function, so trying Claude (and others) is a small change. But I would not switch on a hunch. I would build a bigger set of messy synthetic notes with the right answers, and measure how often each model invents a figure, misses a gap, or asks an unneeded question.
-2. **Let the model add advice in a separate place.** Today only code creates flags. I would let the model also add advisory notes (for example "these two statements contradict each other"), shown separately and labelled as AI suggestions, so they are never confused with the checked flags.
+2. **Make the AI's own notes better and measure them.** The "Noticed by the AI" suggestions are free text. I would test whether they are useful and accurate on a larger set of notes, and avoid repeating what the checked flags already say.
 3. **Add audio file upload** to the page (the transcription function already exists), and for real client calls use a controlled transcription service. Browser speech recognition sends audio to the browser vendor, which is fine for a demo and not for real client data.
 4. **Finish WhatsApp** with an approved sender or message templates (or Meta's own API), so the whole conversation can run live.
 5. **Stop the generator's proposal list growing.** Each load creates a new proposal. I would replace the previous one, but that means reaching into the generator's internals, so I chose to document it instead.

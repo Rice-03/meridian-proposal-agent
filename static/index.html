@@ -111,6 +111,7 @@
   .b-assumption { background: var(--warn-bg); color: var(--warn); }
   .b-missing { background: var(--ask-bg); color: var(--ask); }
   .b-info { background: var(--note-bg); color: var(--note); }
+  .b-ai { background: #efeafb; color: #5b41a8; }
   .group ul { margin: 0; padding-left: 0; list-style: none; }
   .group li {
     padding: 8px 10px; border-left: 3px solid var(--line); background: #f8fafb;
@@ -120,6 +121,8 @@
   .group.assumption li { border-left-color: #d49b1d; }
   .group.missing li { border-left-color: #4a7bc0; }
   .group.info li { border-left-color: #9aa8b5; }
+  .group.ai li { border-left-color: #8a73d6; }
+  .group .ai-help { margin: 0 0 6px; font-size: 12px; color: var(--muted); }
   .ask { margin: 0 0 16px; padding: 12px 14px; background: var(--ask-bg); border: 1px solid #c5d6ee; border-radius: 8px; }
   .ask h3 { margin: 0 0 2px; font-size: 13px; color: var(--ask); }
   .ask .lead { margin: 0 0 10px; color: var(--note); font-size: 12px; }
@@ -414,6 +417,17 @@
         ul,
       ]));
     });
+
+    const aiNotes = (data.ai_notes || []).filter((t) => typeof t === "string" && t.trim());
+    if (aiNotes.length) {
+      const ul = el("ul");
+      aiNotes.forEach((t) => ul.appendChild(el("li", { text: t })));
+      results.appendChild(el("div", { class: "group ai" }, [
+        el("h3", null, ["Noticed by the AI", el("span", { class: "badge b-ai", text: aiNotes.length + " · Suggestion" })]),
+        el("p", { class: "ai-help", text: "The model's own observations. Not checked like the items above, and never added to the proposal." }),
+        ul,
+      ]));
+    }
 
     $("retry-note").textContent = data.retried ? "one correction pass was needed" : "";
   }
