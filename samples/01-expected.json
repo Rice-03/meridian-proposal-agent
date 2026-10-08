@@ -1,0 +1,21 @@
+{
+  "clientName": "Mr George Whitfield",
+  "introGreetTo": "client",
+  "applyModel": "income",
+  "needs": "Mr Whitfield, aged 63, has recently retired and received a lump sum of approximately R6.2 million. He requires a monthly income of about R28,000 to supplement his pension. He has a long time horizon of 15 years or more. Capital preservation is his primary concern, though he recognises the need for some growth to keep pace with inflation. He prefers a predominantly local, income-oriented mandate with limited offshore exposure.",
+  "goalAssessment": {
+    "clientType": "Individual",
+    "mandateType": "Discretionary",
+    "currency": "ZAR",
+    "keyFigures": {
+      "totalInvestment": "6200000",
+      "incomeValue": "28000"
+    }
+  },
+  "objective": {
+    "riskProfile": "Conservative to moderate. Capital preservation is the priority, with sufficient growth to protect the real value of capital over the long term. The portfolio must be able to fund a regular monthly income without forcing the sale of growth assets during market drawdowns."
+  },
+  "fees": {
+    "advisorFee": "0.60"
+  }
+}

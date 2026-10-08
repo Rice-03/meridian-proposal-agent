@@ -1,0 +1,13 @@
+{
+  "clientName": "Mrs Lindiwe Petersen",
+  "introGreetTo": "client",
+  "applyModel": "balanced",
+  "needs": "Mrs Petersen is a new prospect referred by an existing client. She has indicated she wishes to invest a few million rand and, while risk-averse (\"not a gambler\"), still wants her capital to grow. The exact investment amount, income requirement and time horizon were not confirmed on the introductory call and are to be established at the next meeting. A balanced approach has been indicated.\n\n[TO CONFIRM WITH CLIENT: investment amount, monthly income requirement, time horizon.]",
+  "goalAssessment": {
+    "clientType": "Individual",
+    "currency": "ZAR"
+  },
+  "objective": {
+    "riskProfile": "Balanced / moderate, pending confirmation. The client is risk-averse but seeks real growth over time. Risk profile to be finalised once horizon and income needs are established."
+  }
+}

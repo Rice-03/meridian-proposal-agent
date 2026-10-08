@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian Proposal Agent</title>
+<style>
+  :root {
+    --bg: #eef1f4;
+    --panel: #ffffff;
+    --ink: #17212b;
+    --muted: #5d6b79;
+    --line: #d9dfe5;
+    --accent: #0f5c63;
+    --accent-ink: #ffffff;
+    --accent-soft: #e2f0f1;
+    --warn: #8a5a00;
+    --warn-bg: #fdf3dc;
+    --bad: #9b1c1c;
+    --bad-bg: #fbe6e6;
+    --note: #3b4a59;
+    --note-bg: #e9edf1;
+    --ask: #1d4f91;
+    --ask-bg: #e6eefa;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 20px; background: #12303a; color: #fff;
+  }
+  header h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .2px; }
+  header small { color: #a9c3c8; font-weight: 400; margin-left: 10px; }
+  .chip {
+    font-size: 12px; padding: 3px 10px; border-radius: 999px;
+    background: rgba(255,255,255,.12); color: #e6f2f3; white-space: nowrap;
+  }
+  .chip.off { background: #7a2b2b; color: #fff; }
+
+  main {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: 380px 1fr; gap: 16px;
+    padding: 16px;
+  }
+  .col { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 1px 2px rgba(20,35,50,.04);
+  }
+  .card h2 {
+    margin: 0; padding: 12px 16px; font-size: 12px; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .card .body { padding: 14px 16px; }
+
+  #notes-card { flex: 0 0 auto; }
+  textarea {
+    width: 100%; min-height: 190px; max-height: 40vh; resize: vertical;
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+    font: inherit; color: var(--ink); background: #fbfcfd;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; background: #fff; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .actions { display: flex; gap: 8px; flex-shrink: 0; }
+  /* three buttons do not fit beside the hint in a narrow card: hint on its own line, buttons below it */
+  #notes-card .row { flex-wrap: wrap; row-gap: 8px; }
+  #notes-card .hint { flex: 1 0 100%; }
+  #notes-card .actions { flex: 1 1 auto; flex-shrink: 1; }
+  #notes-card .actions .primary { flex: 1; }
+  #notes-card .actions button { padding-left: 10px; padding-right: 10px; }
+  .actions button { white-space: nowrap; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line);
+    background: #fff; color: var(--ink); padding: 8px 14px;
+  }
+  button:hover { background: #f4f6f8; }
+  button.primary {
+    background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+    font-weight: 600; padding: 9px 18px;
+  }
+  button.primary:hover { background: #0c4c52; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .spinner {
+    display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px;
+    border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #banner { display: none; margin: 0 0 0; padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+  #banner.show { display: block; margin-top: 12px; }
+  #banner.error { background: var(--bad-bg); color: var(--bad); }
+  #banner.info { background: var(--note-bg); color: var(--note); }
+
+  #results-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #results { overflow: auto; padding: 14px 16px; flex: 1; }
+  .empty { color: var(--muted); }
+  .summary { font-weight: 600; margin: 0 0 12px; }
+  .group { margin: 0 0 14px; }
+  .group h3 { margin: 0 0 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: 11px; font-weight: 650; padding: 1px 8px; border-radius: 999px; }
+  .b-unverified { background: var(--bad-bg); color: var(--bad); }
+  .b-assumption { background: var(--warn-bg); color: var(--warn); }
+  .b-missing { background: var(--ask-bg); color: var(--ask); }
+  .b-info { background: var(--note-bg); color: var(--note); }
+  .group ul { margin: 0; padding-left: 0; list-style: none; }
+  .group li {
+    padding: 8px 10px; border-left: 3px solid var(--line); background: #f8fafb;
+    border-radius: 0 6px 6px 0; margin-bottom: 6px;
+  }
+  .group.unverified li { border-left-color: var(--bad); }
+  .group.assumption li { border-left-color: #d49b1d; }
+  .group.missing li { border-left-color: #4a7bc0; }
+  .group.info li { border-left-color: #9aa8b5; }
+  .ask { margin: 0 0 16px; padding: 12px 14px; background: var(--ask-bg); border: 1px solid #c5d6ee; border-radius: 8px; }
+  .ask h3 { margin: 0 0 2px; font-size: 13px; color: var(--ask); }
+  .ask .lead { margin: 0 0 10px; color: var(--note); font-size: 12px; }
+  .q { margin: 0 0 12px; }
+  .q label { display: block; font-weight: 600; margin-bottom: 2px; }
+  .q .why { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .q .ans { display: flex; gap: 6px; }
+  .q input[type=text] {
+    flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
+    font: inherit; color: var(--ink); background: #fff;
+  }
+  .q input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .mic { padding: 6px 12px; font-size: 12px; white-space: nowrap; text-transform: none; letter-spacing: 0; }
+  .mic-main.live { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); }
+  .mic.live { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); }
+  .ask .send { margin-top: 2px; }
+
+
+  #gen-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #gen-card h2 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; text-transform: none; letter-spacing: 0; }
+  .seg button { border: 0; border-radius: 0; padding: 4px 12px; font-size: 12px; background: #fff; color: var(--muted); }
+  .seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+  iframe { flex: 1; width: 100%; border: 0; border-radius: 0 0 var(--radius) var(--radius); background: #fff; }
+
+  .tools { display: inline-flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; }
+  .tools button { padding: 4px 12px; font-size: 12px; }
+  body.focus main { grid-template-columns: 1fr; }
+  body.focus .col { display: none; }
+  /* The generator needs about 1065px of width: below 900px it switches to a compact layout, and
+     below about 1062px its right edge is clipped. Side by side therefore needs a window of about
+     1500px; below that we stack (notes and review on top, the generator full width underneath). */
+  @media (max-width: 1499px) {
+    html, body { height: auto; }
+    body { min-height: 100%; }
+    main { flex: none; grid-template-columns: 1fr; }
+    .col { flex-direction: row; align-items: stretch; }
+    .col > section { flex: 1 1 0; min-width: 0; height: 400px; }
+    #notes-card .body { height: calc(100% - 45px); display: flex; flex-direction: column; }
+    #notes-card textarea { flex: 1; max-height: none; min-height: 0; }
+    #gen-card { min-height: 92vh; }
+  }
+  @media (max-width: 760px) {
+    .col { flex-direction: column; }
+    .col > section { height: auto; min-height: 320px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Meridian Proposal Agent <small>notes in, proposal out</small></h1>
+  <span id="status-chip" class="chip">checking...</span>
+</header>
+
+<main>
+  <div class="col">
+    <section class="card" id="notes-card">
+      <h2>Portfolio Manager's notes</h2>
+      <div class="body">
+        <textarea id="notes" spellcheck="true"
+          placeholder="Paste the meeting notes or a voice-note transcript here."></textarea>
+        <div class="row">
+          <span class="hint"><span id="count">0</span> characters &middot; Ctrl+Enter to generate</span>
+          <span class="actions">
+            <button type="button" id="mic-notes" class="mic-main" title="Dictate your notes into the box using the browser's speech recognition. You can edit the text before generating.">Record notes</button>
+            <button id="clear" type="button">Clear</button>
+            <button id="go" class="primary" type="button">Generate proposal</button>
+          </span>
+        </div>
+        <div id="banner" role="alert"></div>
+      </div>
+    </section>
+
+    <section class="card" id="results-card">
+      <h2>Review before sending <span class="hint" id="retry-note"></span></h2>
+      <div id="results"><p class="empty">Questions and flags will appear here. They are for the Portfolio Manager only and are not part of the proposal.</p></div>
+    </section>
+  </div>
+
+  <section class="card" id="gen-card">
+    <h2>
+      <span>Proposal generator</span>
+      <span class="tools">
+        <button type="button" id="focus-btn" title="Hide the notes and review column so the generator gets the whole window">Full width</button>
+        <span class="seg" id="view-seg" title="How the generator opens the proposal">
+          <button type="button" data-view="editor" class="on">Editor</button>
+          <button type="button" data-view="preview">Preview</button>
+        </span>
+      </span>
+    </h2>
+    <iframe id="gen" src="/generator/challenge-generator.html" title="Proposal generator"></iframe>
+  </section>
+</main>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const notesEl = $("notes"), goBtn = $("go"), banner = $("banner"), results = $("results");
+  const gen = $("gen");
+  let lastProposal = null;
+  let view = "editor";
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  /* ---------- helpers ---------- */
+  function el(tag, props, children) {
+    const n = document.createElement(tag);
+    if (props) Object.keys(props).forEach((k) => {
+      if (k === "class") n.className = props[k];
+      else if (k === "text") n.textContent = props[k];
+      else n.setAttribute(k, props[k]);
+    });
+    (children || []).forEach((c) => n.appendChild(typeof c === "string" ? document.createTextNode(c) : c));
+    return n;
+  }
+  function showBanner(kind, text) {
+    banner.className = "show " + kind; banner.textContent = text;
+  }
+  function hideBanner() { banner.className = ""; banner.textContent = ""; }
+
+  /* ---------- status chip ---------- */
+  fetch("/api/status").then((r) => r.json()).then((s) => {
+    const chip = $("status-chip");
+    if (s.llm_ready) { chip.textContent = "Gemini · " + s.model; }
+    else { chip.textContent = "No API key set"; chip.classList.add("off"); }
+    if (!s.generator_ready) {
+      showBanner("error", "The generator file is missing. Copy challenge-generator.html into the generator/ folder (see the README).");
+    }
+  }).catch(() => { $("status-chip").textContent = "server not reachable"; $("status-chip").classList.add("off"); });
+
+  /* ---------- notes box ---------- */
+  notesEl.addEventListener("input", () => { $("count").textContent = notesEl.value.length; });
+  $("clear").addEventListener("click", () => { notesEl.value = ""; $("count").textContent = "0"; hideBanner(); notesEl.focus(); });
+  notesEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) generate(); });
+  goBtn.addEventListener("click", generate);
+  const notesMic = attachMic(notesEl, $("mic-notes"), { continuous: true, idleLabel: "Record notes", busyLabel: "Stop recording" });
+
+  /* ---------- generator hook ---------- */
+  function loadIntoGenerator(proposal, asPreview, target) {
+    return new Promise((resolve, reject) => {
+      let tries = 0;
+      (function attempt() {
+        try {
+          const w = target || gen.contentWindow;
+          if (w && typeof w.loadProposal === "function") {
+            w.loadProposal(proposal, { preview: !!asPreview });
+            return resolve();
+          }
+        } catch (err) {
+          if (!/not ready/i.test(String(err && err.message))) return reject(err);
+        }
+        if (++tries > 100) return reject(new Error("The generator did not become ready."));
+        setTimeout(attempt, 100);
+      })();
+    });
+  }
+
+  $("view-seg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    view = b.dataset.view;
+    document.querySelectorAll("#view-seg button").forEach((x) => x.classList.toggle("on", x === b));
+    if (lastProposal) loadIntoGenerator(lastProposal, view === "preview").catch((err) => showBanner("error", err.message));
+  });
+
+  /* ---------- layout helpers ---------- */
+  $("focus-btn").addEventListener("click", () => {
+    const on = document.body.classList.toggle("focus");
+    $("focus-btn").textContent = on ? "Show notes and review" : "Full width";
+  });
+
+  /* ---------- the agent's questions ---------- */
+  let clarificationHeader = "PM CLARIFICATION";
+  let askedQuestions = [];   // [{label, input}]
+
+
+  // Dictation into a text box using the browser's own speech recognition (Chrome and Edge; the audio is
+  // handled by the browser vendor's service, not by this app). The words are added to the box as text, so
+  // the PM can read and fix them before anything is generated. `continuous` keeps listening through pauses.
+  function attachMic(input, btn, opts) {
+    opts = opts || {};
+    const idle = opts.idleLabel || btn.textContent, busy = opts.busyLabel || "Stop";
+    if (!SpeechRec) { btn.remove(); return null; }   // e.g. Firefox: typing still works
+    let rec = null, wanted = false;
+
+    function finish() {
+      wanted = false; rec = null;
+      btn.textContent = idle; btn.classList.remove("live");
+      input.focus();
+    }
+    function begin() {
+      rec = new SpeechRec();
+      rec.lang = "en-ZA"; rec.interimResults = false; rec.maxAlternatives = 1; rec.continuous = !!opts.continuous;
+      rec.onresult = (ev) => {
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          if (!ev.results[i].isFinal) continue;
+          const heard = ev.results[i][0].transcript.trim();
+          if (!heard) continue;
+          input.value = input.value + (input.value && !/\s$/.test(input.value) ? " " : "") + heard;
+          input.dispatchEvent(new Event("input"));
+        }
+      };
+      rec.onerror = (ev) => {
+        if (ev.error === "no-speech" || ev.error === "aborted") return;   // quiet moments are normal
+        wanted = false;
+        showBanner("info", "Microphone: " + (ev.error === "not-allowed" ? "permission was blocked in the browser." : ev.error));
+      };
+      rec.onend = () => {
+        if (wanted && opts.continuous) { try { begin(); return; } catch (e) { /* fall through */ } }   // the browser stops after silence: carry on
+        finish();
+      };
+      rec.start();
+    }
+    function stop() { wanted = false; if (rec) { try { rec.stop(); } catch (e) { finish(); } } else { finish(); } }
+
+    btn.addEventListener("click", () => {
+      if (rec) { stop(); return; }
+      wanted = true;
+      btn.textContent = busy; btn.classList.add("live");
+      try { begin(); } catch (e) { finish(); }
+    });
+    return { stop: stop, active: () => !!rec };
+  }
+
+  function renderQuestions(questions) {
+    askedQuestions = [];
+    const box = el("div", { class: "ask" });
+    box.appendChild(el("h3", { text: questions.length === 1 ? "The agent has one question" : "The agent has " + questions.length + " questions" }));
+    box.appendChild(el("p", { class: "lead", text: "Answer what you can by typing or speaking. Leave the rest blank. Your answers are added to the notes and the proposal is rebuilt." }));
+    questions.forEach((q, i) => {
+      const id = "q-" + i;
+      const input = el("input", { type: "text", id: id, maxlength: "300", autocomplete: "off" });
+      const mic = el("button", { type: "button", class: "mic", title: "Speak your answer (uses the browser's speech recognition)", text: "Speak" });
+      attachMic(input, mic, { idleLabel: "Speak" });
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") sendAnswers(); });
+      askedQuestions.push({ label: q.label, input: input });
+      box.appendChild(el("div", { class: "q" }, [
+        el("label", { for: id, text: q.question }),
+        el("div", { class: "why", text: q.flags && q.flags[0] ? q.flags[0] : "" }),
+        el("div", { class: "ans" }, [input, mic]),
+      ]));
+    });
+    const send = el("button", { type: "button", class: "primary send", id: "send-answers", text: "Update the proposal" });
+    send.addEventListener("click", sendAnswers);
+    box.appendChild(send);
+    return box;
+  }
+
+  function sendAnswers() {
+    const lines = [];
+    askedQuestions.forEach((q) => {
+      const v = q.input.value.replace(/\s+/g, " ").trim().slice(0, 300);
+      if (v) lines.push("- " + q.label + ": " + v);
+    });
+    if (!lines.length) { showBanner("info", "Type or speak at least one answer first."); return; }
+    let text = notesEl.value.replace(/\s+$/, "");
+    if (text.indexOf(clarificationHeader) === -1) text += "\n\n" + clarificationHeader;
+    notesEl.value = text + "\n" + lines.join("\n");
+    $("count").textContent = notesEl.value.length;
+    generate();
+  }
+
+  /* ---------- results panel ---------- */
+  const GROUPS = [
+    ["unverified", "Check these first", "Not verified, left blank"],
+    ["assumption", "Please confirm", "Confirm"],
+    ["missing", "Not in the notes", "Missing"],
+    ["info", "For information", "Note"],
+  ];
+
+  function renderResults(data) {
+    results.textContent = "";
+    const flags = data.flags || [];
+    const questions = data.questions || [];
+    if (data.clarification_header) clarificationHeader = data.clarification_header;
+
+    // a flag the agent is already asking about is shown with its question, not twice
+    const asked = new Set();
+    questions.forEach((q) => (q.flags || []).forEach((m) => asked.add(m)));
+
+    const needAttention = flags.filter((f) => f.level !== "info").length;
+    results.appendChild(el("p", { class: "summary", text:
+      needAttention === 0 ? "Nothing needs attention." :
+      needAttention + (needAttention === 1 ? " item needs" : " items need") + " the Portfolio Manager's attention before this goes to the client." }));
+
+    if (questions.length) results.appendChild(renderQuestions(questions));
+
+    GROUPS.forEach(([level, title, label]) => {
+      const items = flags.filter((f) => f.level === level && !asked.has(f.message));
+      if (!items.length) return;
+      const ul = el("ul");
+      items.forEach((f) => ul.appendChild(el("li", { text: f.message })));
+      results.appendChild(el("div", { class: "group " + level }, [
+        el("h3", null, [title, el("span", { class: "badge b-" + level, text: items.length + " · " + label })]),
+        ul,
+      ]));
+    });
+
+    $("retry-note").textContent = data.retried ? "one correction pass was needed" : "";
+  }
+
+  /* ---------- generate ---------- */
+  let busy = false;
+  async function generate() {
+    if (busy) return;
+    const notes = notesEl.value.trim();
+    if (!notes) { showBanner("info", "Paste some notes first."); notesEl.focus(); return; }
+    hideBanner();
+    if (notesMic && notesMic.active()) notesMic.stop();
+    busy = true;
+    const sendBtn = $("send-answers");
+    if (sendBtn) sendBtn.disabled = true;
+    goBtn.disabled = true;
+    goBtn.textContent = "";
+    goBtn.appendChild(el("span", { class: "spinner" }));
+    goBtn.appendChild(document.createTextNode("Reading the notes"));
+    try {
+      const res = await fetch("/api/propose", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "The request failed (" + res.status + ").");
+      lastProposal = data.proposal;
+      renderResults(data);
+      if (data.skipped && data.skipped.length) showBanner("info", "Skipped, no change made: " + data.skipped.join(", ") + ".");
+      await loadIntoGenerator(lastProposal, view === "preview");
+    } catch (err) {
+      showBanner("error", err.message || String(err));
+    } finally {
+      busy = false;
+      const stale = $("send-answers");
+      if (stale) stale.disabled = false;
+      goBtn.disabled = false;
+      goBtn.textContent = "Generate proposal";
+    }
+  }
+})();
+</script>
+</body>
+</html>
